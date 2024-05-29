@@ -16,6 +16,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      MIXPEEK_API_KEY: ${{ secrets.MIXPEEK_API_KEY }}
 
     steps:
       - name: Checkout code
@@ -28,12 +29,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: $AWS_REGION
 
+      - name: Call Mixpeek API and use response
+        id: mixpeek
+        run: |
+          response=$(curl --location 'http://localhost:8000/users' \
+            --header 'Authorization: Bearer ${{ secrets.MIXPEEK_API_KEY }}' \
+            --data '')
+          echo "::set-output name=index_id::$response"
+
       - name: Build and push Docker images
         run: |
           for dir in $(find . -type d -maxdepth 1 -mindepth 1); do
             if [[ -f "$dir/handler.py" && -f "$dir/requirements.txt" ]]; then
               foldername=$(basename $dir)
-              index_id=$(git rev-parse --short HEAD)
+              index_id=${{ steps.mixpeek.outputs.index_id }}
               cat > $dir/Dockerfile <<EOF
               FROM python:3.10-slim
               WORKDIR /app
