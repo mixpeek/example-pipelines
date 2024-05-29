@@ -1,4 +1,4 @@
-# Docker Container CI/CD with GitHub Actions
+# Mixpeek Pipeline CI/CD with GitHub Actions
 
 This repository demonstrates how to automatically build and push Docker containers to AWS ECS for each subdirectory in the repository using GitHub Actions.
 
