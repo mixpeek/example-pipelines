@@ -1,0 +1,51 @@
+name: Build and Push Docker Containers
+
+on:
+  push:
+    paths:
+      - "**/handler.py"
+      - "**/requirements.txt"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: mixpeek-pipelines
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: $AWS_REGION
+
+      - name: Build and push Docker images
+        run: |
+          for dir in $(find . -type d -maxdepth 1 -mindepth 1); do
+            if [[ -f "$dir/handler.py" && -f "$dir/requirements.txt" ]]; then
+              foldername=$(basename $dir)
+              index_id=$(git rev-parse --short HEAD)
+              cat > $dir/Dockerfile <<EOF
+              FROM python:3.10-slim
+              WORKDIR /app
+              COPY requirements.txt .
+              RUN pip install --no-cache-dir -r requirements.txt
+              COPY . .
+              CMD ["python", "handler.py"]
+              EOF
+              docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$foldername-$index_id:latest $dir
+              docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$foldername-$index_id:latest
+            fi
+          done
+
+      - name: Log out from Docker Hub
+        run: docker logout
